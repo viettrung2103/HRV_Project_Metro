@@ -1,0 +1,3 @@
+[submodule "HRV_pico_start"]
+	path = HRV_pico_start
+	url = https://github.com/viettrung2103/HRV_pico_start
