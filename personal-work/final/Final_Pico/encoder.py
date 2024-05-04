@@ -25,7 +25,7 @@ class Isr_Fifo(Fifo):
         if self.stop_flag == False :
             self.put(self.av.read_u16())
             self.dbg.toggle()  
-  
+
     def handler(self,tid):
         if self.cur_program != None:
             name = self.cur_program.name
@@ -43,29 +43,33 @@ class Encoder:
         self.cur_selector = None
         self.cur_program  = None
         # self.press = False
-        self.p00_fifo = Fifo(30)
-        self.t00_fifo = Fifo(30, typecode = "i") #signed = "i"
+        self.p00_fifo = Fifo(15)
+        self.t00_fifo = Fifo(15, typecode = "i") #signed = "i"
         
-        self.p10_fifo = Fifo(30) #default is unsigned "H"
-        self.p11_fifo = Fifo(30)
+        self.p_x1_fifo = Fifo(15)
+        # self.p_x10_fifo = Fifo(15)
+        self.p_xx0_fifo = Fifo(15)
         
-        self.p20_fifo = Fifo(30)
-        self.p21_fifo = Fifo(30)
-        self.p210_fifo = Fifo(30)
-        self.p22_fifo = Fifo(30)
-        self.p220_fifo = Fifo(30)
-        self.p23_fifo = Fifo(30)
+        self.p10_fifo = Fifo(15) #default is unsigned "H"
+        # self.p11_fifo = Fifo(15)
         
-        self.p30_fifo = Fifo(30)
-        self.p31_fifo = Fifo(30)
-        self.p310_fifo = Fifo(30)
-        self.p32_fifo = Fifo(30)
-        self.p320_fifo = Fifo(30)
-        self.p33_fifo = Fifo(30)
+        self.p20_fifo = Fifo(15)
+        # self.p21_fifo = Fifo(15)
+        # self.p210_fifo = Fifo(15)
+        self.p22_fifo = Fifo(15)
+        self.p220_fifo = Fifo(15)
+        self.p23_fifo = Fifo(15)
         
-        self.p40_fifo = Fifo(30)
-        self.t40_fifo = Fifo(30)
-        self.p41_fifo = Fifo(30)
+        self.p30_fifo = Fifo(15)
+        # self.p31_fifo = Fifo(15)
+        # self.p310_fifo = Fifo(15)
+        self.p32_fifo = Fifo(15)
+        self.p320_fifo = Fifo(15)
+        self.p33_fifo = Fifo(15)
+        
+        self.p40_fifo = Fifo(15)
+        self.t40_fifo = Fifo(15)
+        self.p41_fifo = Fifo(15)
         
         self.sw.irq(handler = self.press_handler, trigger = Pin.IRQ_RISING, hard = True)
         self.a.irq (handler = self.turn_handler, trigger = Pin.IRQ_RISING, hard = True)
@@ -80,16 +84,23 @@ class Encoder:
         name = self.cur_program.name
         if name == "00":
             return self.p00_fifo
+        elif name == "11" or name == "21" or name == "31":            
+            return self.p_x1_fifo
+        
+        elif name == "210" or name == "310" or name == "220" or name == "320":            
+            # return self.p_x10_fifo
+            return self.p_xx0_fifo
+        
         elif name == "10":
             return self.p10_fifo
-        elif name == "11":
-            return self.p11_fifo
+        # elif name == "11":
+        #     return self.p11_fifo
         elif name == "20":
             return self.p20_fifo
-        elif name == "21":
-            return self.p21_fifo
-        elif name == "210":
-            return self.p210_fifo
+        # elif name == "21":
+        #     return self.p21_fifo
+        # elif name == "210":
+        #     return self.p210_fifo
         elif name == "22":
             return self.p22_fifo
         elif name == "220":
@@ -98,10 +109,10 @@ class Encoder:
             return self.p23_fifo
         elif name == "30":
             return self.p30_fifo
-        elif name == "31":
-            return self.p31_fifo
-        elif name == "310":
-            return self.p310_fifo
+        # elif name == "31":
+        #     return self.p31_fifo
+        # elif name == "310":
+        #     return self.p310_fifo
         elif name == "32":
             return self.p32_fifo
         elif name == "320":

@@ -1,3 +1,5 @@
+import ujson
+
 t = 4 #4ms
 frequency = 250
 MINUTE = 60
@@ -110,6 +112,17 @@ def read_file(file_name):
     with open(file_name) as f:
         payload = ujson.load(f)
         return payload
+    
+def convert_to_int(num):
+    new_num = int(round(num,0))
+    return new_num
+
+def get_x_starting(text):
+    str_len = len(text) * LETTER_WIDTH
+    middle_str = int(round((str_len /2),0))
+    x_middle = int(round(OLED_WIDTH / 2, 0)) #0 - 127
+    x_starting = x_middle - middle_str
+    return x_starting
 # min_ppi_count = find_ppi_count_from_hr(MAX_HR)
 # max_ppi_count = find_ppi_count_from_hr(MIN_HR)
 

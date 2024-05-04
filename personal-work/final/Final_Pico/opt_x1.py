@@ -7,6 +7,7 @@ import math
 import time
 from encoder import Isr_Fifo, Encoder
 import util
+import ujson 
 
 
 t = 4 #4ms
@@ -72,7 +73,13 @@ Y_ROW_1 = 0
 Y_ROW_2 = COLUMN_SPACE + LETTER_HEIGHT
 Y_ROW_3 = Y_ROW_2 + COLUMN_SPACE + LETTER_HEIGHT
 
-
+Y_ROW_1 = 0
+Y_ROW_2 = COLUMN_SPACE + LETTER_HEIGHT
+Y_ROW_3 = Y_ROW_2 + COLUMN_SPACE + LETTER_HEIGHT
+Y_ROW_4 = Y_ROW_3 + COLUMN_SPACE + LETTER_HEIGHT
+Y_ROW_5 = Y_ROW_4 + COLUMN_SPACE + LETTER_HEIGHT
+Y_ROW_6 = Y_ROW_5 + COLUMN_SPACE + LETTER_HEIGHT
+Y_ROW_7 = Y_ROW_6 + COLUMN_SPACE + LETTER_HEIGHT
 
 min_ppi_count = util.find_ppi_count_from_hr(MAX_HR)
 max_ppi_count = util.find_ppi_count_from_hr(MIN_HR)
@@ -80,12 +87,11 @@ max_ppi_count = util.find_ppi_count_from_hr(MIN_HR)
 MIN_PULSE = util.find_beat_from_hr(MIN_HR)
 MAX_PULSE = util.find_beat_from_hr(MAX_HR)
 
-class Opt11_Mean_Program:
+class Optx1_Mean_Program:
     def __init__(self,size):
         self.size = size
         self.array = []
         self.mean = 0
-        
         
     def add(self,value):
         if len(self.array) < self.size:
@@ -96,7 +102,6 @@ class Opt11_Mean_Program:
     
     def is_full(self):
         return self.size == len(self.array)
-    
     
     def show_array(self):
         print(self.array)
@@ -109,17 +114,15 @@ class Opt11_Mean_Program:
     
     def find_mean(self):
         sum = self.find_sum()
-
         self.mean = round(sum / self.size,0)
 
-    
     def add_and_find_mean(self,value):
         self.add(value)
         if self.is_full():
             self.find_mean()
             
 
-class Opt11:
+class Optx1:
     def __init__(self,name,display, mean_program, test_sample_size, sample_size,frequency, encoder,isr_fifo, selector = None):
         
         self.name = name
@@ -144,7 +147,6 @@ class Opt11:
         self.data_count = 0 # count data between 2 peaks
         self.peak_count = 0
         self.count_flag = False
-#         self.crs_up_flag = False
         self.crs_down_off_flag = False
         self.ppi_count = 0
         self.ppi = 0
@@ -165,17 +167,16 @@ class Opt11:
         self.rmssd = 0
         self.sdnn = 0
         self.time = 0
-        
+        self.data = None
         self.stop_flag = False
         self.press = False
+        self.error_flag = False
         
     def default_value(self):
         self.min = 0
         self.max = 0
         self.pre_on_th = 0
         self.pre_off_th = 0
-#         self.th_flag = False # to find th
-#         self.good_th_flag = False # to check if it is a good sample
         self.good_th_count = 0
         self.cur_val = 0
         self.pre_val = 0
@@ -183,7 +184,6 @@ class Opt11:
         self.data_count = 0 # count data between 2 peaks
         self.peak_count = 0
         self.count_flag = False
-#         self.crs_up_flag = False
         self.crs_down_off_flag = False
         self.ppi_count = 0
         self.ppi = 0
@@ -204,9 +204,11 @@ class Opt11:
         self.rmssd = 0
         self.sdnn = 0
         self.time = 0
+        self.data = None
         
         self.stop_flag = False
         self.press = False
+        self.error_flag = False
         
     def is_greater(self,value):
         return value > self.max
@@ -321,19 +323,31 @@ class Opt11:
         if self.is_too_bad_hr(hr):
             self.found_too_bad_hr()
         
-        
-            
     def is_good_ppi_count(self):
         if min_ppi_count < self.ppi_count and self.ppi_count < max_ppi_count: #100-300
             return True
         else:
             return False
         
-        
     def found_good_ppi(self):
         self.found_ppi_flag = True
-            
         
+    def is_error(self):
+        if len(self.ppi_list) <= 6 and self.time >= 20:
+            return True
+        else:
+            return False
+    
+    def found_error(self):         
+        self.error_flag = True
+        self.stop_flag = True
+        self.press = True
+            
+    def check_error(self):
+        if self.is_error():
+            print("error")
+            self.found_error()
+    
     def validate_ppi_count(self):
         if self.is_good_ppi_count():
             self.found_good_ppi()
@@ -357,9 +371,9 @@ class Opt11:
             self.sorf_reset_flag = True
         self.validate_hr(hr)
         self.validate_ppi_count()
-        self.validate_long_time()
 
-        if self.soft_reset_flag == False and self.hard_reset_flag == False  and self.found_ppi_flag == True:
+
+        if self.soft_reset_flag == False and self.hard_reset_flag == False  and self.found_ppi_flag == True and self.error_flag == False:
             self.display_hr(ppi, hr)
         else:
             self.soft_reset()
@@ -385,8 +399,13 @@ class Opt11:
         if self.peak_count <= 8 and self.peak_flag == True:
             self.find_hr_v2()
             
-        if self.sample_count % 250 == 0:
-          self.display.update_hr_str(self.hr)
+
+            
+        # if self.sample_count % 250 == 0:
+        #     self.display.update_time_str(self.time)
+        #   self.display.upda(self.hr, self.time)
+
+
 
         if self.sample_count >= self.sample_size:
             self.hard_reset_flag = True
@@ -412,9 +431,9 @@ class Opt11:
         self.time_count += 2 #+ two second
         
     def update_time(self):
-        if self.sample_count >0:
-            if self.sample_count % self.frequency == 0:
-                self.time += 1
+        # if self.sample_count >0:
+        if self.sample_count % self.frequency == 0:
+            self.time += 1
             
     def read_find_mean_v3(self,data):
         if self.mean_program.size == 1:
@@ -463,6 +482,7 @@ class Opt11:
         if self.sample_count == 1:
             self.min = data
             self.max = data
+#             self.display.update_str(self.hr, self.time)
             self.display.update_hr_str(self.hr)
         if self.sample_count < self.mean_program.size: # when mean_program size is not full
             self.mean_program.add(data)
@@ -475,10 +495,10 @@ class Opt11:
             if self.is_first_time():
                 self.sample_count = 0
                 self.first_flag = False
-                
-                
+                              
     def display_current_time(self):
         if self.sample_count % frequency == 0:
+            self.display.update_time_str(self.time)
             print("t = ",self.time)
 
     def find_mean_ppi(self):
@@ -521,24 +541,37 @@ mean HR  = {self.mean_hr} BPM
 rmssd    = {self.rmssd}
 sdnn     = {self.sdnn}
 """)              
-                          
-    def press_encoder(self):
-        option = self.encoder.p11_fifo.get()
-        if option == 1:
-#             print("pressed")
-            self.stop_flag = True
-            
-#     def press(self):
         
-            
-    
+    def press_encoder(self):
+
+        p_fifo = self.encoder.p_x1_fifo        
+        while p_fifo.has_data():
+
+            option = p_fifo.get()
+            if option == 1:
+                if self.name == "11":
+                    print("pressed")
+
+                    self.stop_flag = True
+                else:
+                    if len(self.ppi_list) < 15 and self.time < 30:
+                        print("pressed")
+                        self.error_flag = True
+                        self.stop_flag = True
+#                 self.stop_flag = True
+#                 pass
+        
+
     def is_program_stop(self):
-        if self.time == 30 or self.stop_flag == True:
+#         if self.time == 30 or self.stop_flag == True:
+#         if self.stop_flag == True:
+#             return True
+        if self.time >= 30 and len(self.ppi_list) >= 15:    
+            return True
+        elif self.error_flag == True:
             return True
         else:
             return False
-        
-
 
     def is_main_program_run(self):
         if self.isr_fifo.has_data() and self.stop_flag == False:
@@ -547,31 +580,68 @@ sdnn     = {self.sdnn}
             return False
 
     def hr_program(self):
-          while self.is_main_program_run():
-              data = self.isr_fifo.get()
-              self.sample_count += 1
+        while self.is_main_program_run():
+            self.validate_long_time()
+            self.check_error()
+            
+            data = self.isr_fifo.get()
+            self.sample_count += 1
 #               print(data)
-              if LOWER_LIM <= data and data <= MAX_ADC - LOWER_LIM:
-                  self.update_time()
-                  self.display_current_time()
-                  self.find_min_max_th_v3(data)
-                  if self.has_th():    
-                      self.read_v3(data) 
-                  if self.hard_reset_flag == True:
-                      self.hard_reset()
-                  
-              while self.encoder.p11_fifo.has_data():
-                  self.press_encoder()    
-              if self.is_program_stop():
-                  self.stop()
+            if LOWER_LIM <= data and data <= MAX_ADC - LOWER_LIM:
+                
+            #   self.display_current_time()
+                self.find_min_max_th_v3(data)
+                if self.has_th():    
+                    self.read_v3(data) 
+                if self.hard_reset_flag == True:
+                    self.hard_reset()
+                
+#               while self.encoder.p21_fifo.has_data():
+            self.update_time()
+            self.display_current_time()
+            
+#             self.display.u
+            if self.sample_count % 250 == 125:
+                self.display.update_hr_str(self.hr)
+            self.press_encoder()    
+            if self.is_program_stop():
+                self.stop()
+    
+    def send_ppi_list(self):
+        if self.ppi_list != []:
+            return self.ppi_list
+    
+    def create_data(self):
+        # measure = {}
+        if self.error_flag == False:
+            measure = {
+                "mean_hr" : f"{self.mean_hr}",
+                "mean_ppi" : f"{self.mean_ppi}",
+                "rmssd" : f"{self.rmssd}",
+                "sdnn" : f"{self.sdnn}",
+            }
+            if self.name == "11":
+                file_name = "result_11.json"
+            if self.name == "21":
+                file_name = "result_21.json"
+            if self.name == "31":
+                file_name = "result_31.json"
+            util.write_file(file_name,measure)
+        # self.data = ujson.dumps(measure)
+        # else:
+        #     self.data = {}
+        # return self.data
+
                   
     def on(self):
         self.press = False
         self.stop_flag = False
         self.display.stop_flag = False
         self.isr_fifo.stop_flag = False
+        self.error_flag = False
         self.encoder.update_program(self)
         self.isr_fifo.update_program(self)
+        self.display.default_setting()
         self.run()
         
     def off(self):
@@ -585,6 +655,7 @@ sdnn     = {self.sdnn}
         self.off()
         self.display_result()
         print(f"program {self.name} stop")
+        self.create_data()
         self.press = True
             
     def run(self):
@@ -596,11 +667,12 @@ sdnn     = {self.sdnn}
         while self.stop_flag != True:
             if self.display.update_flag == False:
                 if self.hard_reset_flag == True:
-                    self.reset()
+                    self.hard_reset()
                 else:
                     self.hr_program()
             else:
                 self.display.show_result()
+
                 
 # def get_x_starting(text):
 #     str_len = len(text) * LETTER_WIDTH
@@ -609,30 +681,59 @@ sdnn     = {self.sdnn}
 #     x_starting = x_middle - middle_str
 #     return x_starting
 
-Y_ROW_1 = 0
-Y_ROW_2 = COLUMN_SPACE + LETTER_HEIGHT
-Y_ROW_3 = Y_ROW_2 + COLUMN_SPACE + LETTER_HEIGHT
-Y_ROW_4 = Y_ROW_3 + COLUMN_SPACE + LETTER_HEIGHT
-Y_ROW_5 = Y_ROW_4 + COLUMN_SPACE + LETTER_HEIGHT
-Y_ROW_6 = Y_ROW_5 + COLUMN_SPACE + LETTER_HEIGHT
-Y_ROW_7 = Y_ROW_6 + COLUMN_SPACE + LETTER_HEIGHT
+
 
 # 
-class Opt11_Display:
+class Optx1_Display:
     def __init__(self,i2c,scl_pin,sda_pin,frequency,oled_w,oled_h):
         self.i2c = I2C(i2c, scl=scl_pin, sda = sda_pin, freq = frequency)
         self.display = SSD1306_I2C(oled_w, oled_h, self.i2c)
-        self.hr_str = "0 BPM"
+        self.hr_str = "00 BPM"
+        self.time_str = "t = 00s"
+        self.measure_str = "MEASURE.. "
         self.stop_flag = False
         self.update_flag = True
+        # self.update_flag = False
 
     def update_hr_str(self, hr):
         if self.update_flag == False:
-            self.hr_str = f"{hr} BPM"
-#             self.time_str = f"t = {time}"
+            if hr > 10:
+                self.hr_str = f"{hr} BPM"
+            else:
+                self.hr_str = f"0{hr} BPM"
+            # self.time_str = f"t = {time}"
             # print("updating")
             # print("hr_str ",self.hr_str)
             self.update_flag =True
+            
+    def update_time_str(self,time):
+        if self.update_flag == False:
+            if time < 10:
+                self.time_str = f"t = 0{time}s"
+            else:
+                self.time_str = f"t = {time}s"
+            if time % 4 == 0:
+                self.measure_str = "MEASURE.. "
+            elif time % 4 == 1:
+                self.measure_str = "MEASURE. ."     
+            elif time % 4 == 2:
+                self.measure_str = "MEASURE .."
+            else :
+                self.measure_str = "MEASURE. ."   
+                self.update_flag = True
+                
+    def default_setting(self):
+        self.hr_str = "00 BPM"
+        self.time_str = "t = 00s"
+        self.stop_flag = False
+        self.update_flag = True
+        # self.update_flag = False
+            
+    # def update_str(self,hr, time):
+    #     if self.update_flag == False:
+    #         self.update_hr_str(hr)
+    #         self.update_time_str(time)
+    #         self.update_flag = True
         
     def reset(self):
         self.display.fill(0)
@@ -640,23 +741,25 @@ class Opt11_Display:
     def show_result(self):
         
         if self.update_flag == True:
-            text_1 = "PRESS THE BUTTON"
-            text_2 = "TO STOP"
+            # text_1 = "MEASURING ..."
+#             text_2 = "TO STOP"
             
+            time_str_x = util.get_x_starting(self.time_str)
             hr_str_x = util.get_x_starting(self.hr_str)
-            text_1_x = util.get_x_starting(text_1)
-            text_2_x = util.get_x_starting(text_2)
+            text_1_x = util.get_x_starting(self.measure_str)
+#             text_2_x = util.get_x_starting(text_2)
             
             self.reset()
+            self.display.text(self.time_str, time_str_x,Y_ROW_2)
             self.display.text(self.hr_str, hr_str_x,Y_ROW_3)
-            self.display.text(text_1,text_1_x,Y_ROW_5)
-            self.display.text(text_2,text_2_x,Y_ROW_6)
+            self.display.text(self.measure_str,text_1_x,Y_ROW_5)
+#             self.display.text(text_2,text_2_x,Y_ROW_6)
             self.update_flag = False
             self.display.show()
             
 # hz = 20
 # wait = round(1/hz,2)
-
+# 
 # adc_pin_nr = 27
 # sample_size = 500 # want 250
 # test_sample_size = 500
@@ -665,9 +768,9 @@ class Opt11_Display:
 # encoder = Encoder(ROT_A_PIN,ROT_B_PIN,ROT_SW_PIN)
 # samples = Isr_Fifo(sample_size,adc_pin_nr)
 # timer = Piotimer(mode = Piotimer.PERIODIC, freq = sample_rate, callback = samples.handler) 
- 
-# opt11_display = Opt11_Display(I2C_MODE,SCL_PIN,SDA_PIN ,FREQ, OLED_WIDTH, OLED_HEIGHT)
-# opt11_mean_program = Opt11_Mean_Program(step)
-# opt11 = Opt11("11", opt11_display,opt11_mean_program, test_sample_size, sample_size,frequency, encoder,samples)
-
-# opt11.on()
+#  
+# opt21_display = Optx1_Display(I2C_MODE,SCL_PIN,SDA_PIN ,FREQ, OLED_WIDTH, OLED_HEIGHT)
+# opt21_mean_program = Optx1_Mean_Program(step)
+# opt21 = Optx1("21", opt21_display,opt21_mean_program, test_sample_size, sample_size,frequency, encoder,samples)
+# 
+# opt21.on()
